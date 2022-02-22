@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npx tsc server.ts && node server.js",
+    "dev": "npx tsc server.ts && node server.js",
+    "build": "npx tsc server.ts",
     "start": "node server.js"
   },
   "keywords": [],

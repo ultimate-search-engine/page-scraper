@@ -18,12 +18,10 @@ RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
 WORKDIR /app
 COPY package.json .
 COPY package-lock.json .
-COPY page-types.ts .
-COPY page-scraper.ts .
 COPY server.ts .
 
 RUN npm install
-RUN npx tsc server.ts
+RUN npm run build
 
 EXPOSE 8080
 
