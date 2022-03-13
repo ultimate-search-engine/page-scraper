@@ -21,23 +21,33 @@ puppeteer.launch({
     args: [
         "--no-sandbox",
     ]
-}).then(browser => {
+}).then(r => {
+    main(r)
+})
+
+
+function main(browser: puppeteer.Browser) {
     console.log("Server started on port:", port)
     app.post('/crawler', async function (request: { body: any; }, response: any) {
-        console.log("scraping url:", request.body.url)
+        console.log("Url:", request.body.url)
+
+        const pageCtx: puppeteer.Page = await browser.newPage();
+
         try {
             let result: Request
-            let page = await scrape(browser, request.body.url)
+            let page = await scrape(pageCtx, request.body.url)
             if (page != null && page.hasResponse) {
                 result = {url: page.url, html: page.html, status: 200}
             } else {
                 result = {url: request.body.url, html: "", status: 404}
             }
             response.send(result)
+
         } catch (e: any) {
             console.log(e)
-            return response.send({url: request.body.url, html: "", status: 400})
+            response.send({url: request.body.url, html: "", status: 400})
         }
+        await pageCtx.close()
     });
 
     app.get('/', function (request: { body: any; }, response: { send: (arg0: any) => void; }) {
@@ -47,7 +57,7 @@ puppeteer.launch({
     });
 
     app.listen(port)
-});
+}
 
 
 // async function fetchToUrl(content: { url: string, html: string, status: number }, url: string) {
@@ -60,8 +70,7 @@ puppeteer.launch({
 // }
 
 
-async function scrape(browser: puppeteer.Browser, url: string): Promise<scrape> {
-    const page: puppeteer.Page = await browser.newPage();
+async function scrape(page: puppeteer.Page, url: string): Promise<scrape> {
     await page.setRequestInterception(true);
     page.on('request', (request) => {
         if (['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1) {
@@ -80,31 +89,21 @@ async function scrape(browser: puppeteer.Browser, url: string): Promise<scrape> 
 
     const goto = page.goto(url, {
         waitUntil: 'networkidle0',
-        timeout: 18_000
+        timeout: 15_000
     }).catch(() => {
     }).then(() => {
         done = true
     })
 
 
-    const timeout = new Promise(resolve => {
-        setTimeout((e) => {
-            resolve(e)
-            if (!done) {
-                console.log("Url:", url, "timed out")
-            }
-        }, 15_000)
-    });
-
-    await Promise.race([timeout, goto])
+    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 18_000));
+    await Promise.race([goto, timeout])
 
     try {
-        const html = await page.content();
-        await page.close();
+        const html = await Promise.race([page.content(), new Promise(resolve => setTimeout(() => resolve(""), 5_000))]) as string
         return {url, html, hasResponse};
     } catch (e) {
         console.log(e)
-        await page.close();
         return null;
     }
 }
