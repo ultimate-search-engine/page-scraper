@@ -1,12 +1,16 @@
-import * as puppeteer from "puppeteer";
+import {Browser, Page, PuppeteerLifeCycleEvent} from "puppeteer";
+
+const puppeteer = require('puppeteer-extra')
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 
 const bodyParser = require("body-parser")
 const express = require('express');
 
 const app = express();
+
 app.use(bodyParser.json());
 
-type Request = {
+type HttpRes = {
     url: string,
     html: string,
     status: number
@@ -14,39 +18,38 @@ type Request = {
 
 const port = 8080
 
-type scrape = { url: string, html: string, hasResponse: boolean } | null
+type scrape = { url: string, html: string, hasResponse: boolean }
 
+
+puppeteer.use(StealthPlugin())
 puppeteer.launch({
     headless: true,
     args: [
         "--no-sandbox",
     ]
-}).then(r => {
+}).then((r: any) => {
     main(r)
 })
 
 
-function main(browser: puppeteer.Browser) {
+function main(browser: Browser) {
     console.log("Server started on port:", port)
     app.post('/crawler', async function (request: { body: any; }, response: any) {
-        console.log("Url:", request.body.url)
+        console.log("scraping url:", request.body.url)
 
-        const pageCtx: puppeteer.Page = await browser.newPage();
+        const pageCtx = await browser.newPage();
+        let result: HttpRes
 
         try {
-            let result: Request
             let page = await scrape(pageCtx, request.body.url)
-            if (page != null && page.hasResponse) {
-                result = {url: page.url, html: page.html, status: 200}
-            } else {
-                result = {url: request.body.url, html: "", status: 404}
-            }
-            response.send(result)
+            if (page != null && page.hasResponse) result = {url: page.url, html: page.html, status: 200}
+            else result = {url: request.body.url, html: "", status: 404}
 
         } catch (e: any) {
             console.log(e)
-            response.send({url: request.body.url, html: "", status: 400})
+            result = {url: request.body.url, html: "", status: 400}
         }
+        response.send(result)
         await pageCtx.close()
     });
 
@@ -70,9 +73,9 @@ function main(browser: puppeteer.Browser) {
 // }
 
 
-async function scrape(page: puppeteer.Page, url: string): Promise<scrape> {
+async function scrape(page: Page, url: string, waitUntil: PuppeteerLifeCycleEvent = "networkidle0"): Promise<scrape | null> {
     await page.setRequestInterception(true);
-    page.on('request', (request) => {
+    page.on('request', (request: { resourceType: () => string; abort: () => void; continue: () => void; }) => {
         if (['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1) {
             request.abort();
         } else {
@@ -85,23 +88,19 @@ async function scrape(page: puppeteer.Page, url: string): Promise<scrape> {
     })
 
     let hasResponse = false
-    let done = false
 
     const goto = page.goto(url, {
-        waitUntil: 'networkidle0',
-        timeout: 15_000
+        waitUntil: waitUntil,
+        timeout: 25_000
     }).catch(() => {
     }).then(() => {
-        done = true
     })
 
-
-    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 18_000));
+    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 30_000));
     await Promise.race([goto, timeout])
 
     try {
-        const html = await Promise.race([page.content(), new Promise(resolve => setTimeout(() => resolve(""), 5_000))]) as string
-        return {url, html, hasResponse};
+        return {url: page.url(), html: await page.content(), hasResponse};
     } catch (e) {
         console.log(e)
         return null;
