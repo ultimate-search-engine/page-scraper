@@ -2,7 +2,7 @@ POST http://localhost:8080/crawler
 Content-Type: application/json
 
 {
-  "url": "https://ancient-greece-cool.web.app/"
+  "url": "https://blog.iservery.com/"
 }
 
 ###

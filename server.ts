@@ -20,24 +20,28 @@ const port = 8080
 
 type scrape = { url: string, html: string, hasResponse: boolean }
 
+const browsers = [] as Browser[]
 
 puppeteer.use(StealthPlugin())
-puppeteer.launch({
-    headless: true,
-    args: [
-        "--no-sandbox",
-    ]
-}).then((r: any) => {
-    main(r)
+addNewBrowser().then(() => {
+    main()
 })
 
+async function addNewBrowser() {
+    browsers.push(await puppeteer.launch({
+        headless: true,
+        args: [
+            "--no-sandbox",
+        ]
+    }))
+}
 
-function main(browser: Browser) {
+function main() {
     console.log("Server started on port:", port)
     app.post('/crawler', async function (request: { body: any; }, response: any) {
         console.log("scraping url:", request.body.url)
 
-        const pageCtx = await browser.newPage();
+        const pageCtx = await browsers[browsers.length - 1].newPage();
         let result: HttpRes
 
         try {
@@ -103,6 +107,13 @@ async function scrape(page: Page, url: string, waitUntil: PuppeteerLifeCycleEven
         return {url: page.url(), html: await page.content(), hasResponse};
     } catch (e) {
         console.log(e)
+        const browserPos = browsers.length - 1
+        addNewBrowser().then(_ => {
+            new Promise(resolve => setTimeout(() => resolve(null), 30_000)).then(_ => {
+                console.log('Closing old browser')
+                browsers[browserPos].close()
+            })
+        })
         return null;
     }
 }
