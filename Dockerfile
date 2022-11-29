@@ -20,6 +20,7 @@ RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
 # Run everything after as non-privileged user.
 
 WORKDIR /app
+RUN touch .env
 RUN npm init -y && \
     npm i puppeteer express
 COPY ./page-scraper/package.json .
