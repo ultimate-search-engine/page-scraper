@@ -32,6 +32,7 @@ async function addNewBrowser() {
         headless: true,
         args: [
             "--no-sandbox",
+            '--disable-dev-shm-usage'
         ]
     }))
 }
@@ -43,18 +44,22 @@ function main() {
 
         const pageCtx = await browsers[browsers.length - 1].newPage();
         let result: HttpRes
+        let isError = false
 
         try {
             let page = await scrape(pageCtx, request.body.url)
             if (page != null && page.hasResponse) result = {url: page.url, html: page.html, status: 200}
-            else result = {url: request.body.url, html: "", status: 404}
-
+            else if (page != null && !page.hasResponse) result = {url: request.body.url, html: "", status: 404}
+            else {
+                isError = true
+                result = {url: request.body.url, html: "", status: 400}
+            }
         } catch (e: any) {
             console.log(e)
             result = {url: request.body.url, html: "", status: 400}
         }
         response.send(result)
-        await pageCtx.close()
+        if (!isError) await pageCtx.close()
     });
 
     app.get('/', function (request: { body: any; }, response: { send: (arg0: any) => void; }) {
@@ -106,12 +111,13 @@ async function scrape(page: Page, url: string, waitUntil: PuppeteerLifeCycleEven
     try {
         return {url: page.url(), html: await page.content(), hasResponse};
     } catch (e) {
+        console.log("url failed:", url)
         console.log(e)
         const browserPos = browsers.length - 1
         addNewBrowser().then(_ => {
-            new Promise(resolve => setTimeout(() => resolve(null), 30_000)).then(_ => {
+            new Promise(resolve => setTimeout(() => resolve(null), 50_000)).then(_ => {
                 console.log('Closing old browser')
-                browsers[browserPos].close()
+                browsers[browserPos].close().then(() => {})
             })
         })
         return null;
