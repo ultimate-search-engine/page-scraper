@@ -8,8 +8,8 @@ RUN apt-get update && \
       libxtst6 ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils libgbm-dev libxkbcommon-x11-0 libgtk-3-0 wget && \
     rm -rf /var/lib/apt/lists/*
 
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true 
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 
 # Add user so we don't need --no-sandbox.
